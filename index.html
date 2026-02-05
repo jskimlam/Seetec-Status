@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚢 대산항 Seetec 포트 현황판</title>
+    <style>
+        :root { --bg: #f4f7f6; --open: #2ecc71; --closed: #e74c3c; --none: #dfe6e9; --text: #2d3436; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: var(--text); }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* 헤더 및 내비게이션 */
+        .header { background: #34495e; color: #fff; padding: 20px; text-align: center; }
+        .month-nav { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 15px; background: #f8f9fa; }
+        .m-btn { border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .m-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
+
+        /* 달력 그리드 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid #eee; }
+        .weekday { background: #f1f2f6; text-align: center; padding: 10px 0; font-size: 0.8rem; font-weight: bold; border-bottom: 1px solid #eee; }
+        .day-cell { border-right: 1px solid #eee; border-bottom: 1px solid #eee; min-height: 85px; position: relative; background: #fff; }
+        .day-num { font-size: 0.75rem; font-weight: bold; padding: 5px; color: #636e72; }
+        
+        /* 오전/오후 슬롯 */
+        .slot-container { display: flex; flex-direction: column; height: 60px; gap: 2px; padding: 2px; }
+        .slot { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border-radius: 3px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        .slot:active { transform: scale(0.95); }
+        .slot.none { background: var(--none); color: #999; cursor: default; }
+        .slot.open { background: var(--open); color: #fff; }
+        .slot.closed { background: var(--closed); color: #fff; }
+
+        /* 상세 모달 팝업 */
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; color: #333; }
+        .modal-info { font-size: 1.3rem; font-weight: 800; margin: 15px 0; }
+        .modal-close { background: #34495e; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+
+        .legend { display: flex; justify-content: center; gap: 15px; padding: 15px; font-size: 0.8rem; border-top: 1px solid #eee; }
+        .leg-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header"><h2>🚢 2026 대산항 포트 현황판</h2></div>
+    <div class="month-nav" id="monthNav"></div>
+    <div class="calendar-grid" id="calendar">
+        <div class="weekday">일</div><div class="weekday">월</div><div class="weekday">화</div>
+        <div class="weekday">수</div><div class="weekday">목</div><div class="weekday">금</div><div class="weekday">토</div>
+    </div>
+    <div class="legend">
+        <div class="leg-item"><div class="dot" style="background:var(--open)"></div>오픈</div>
+        <div class="leg-item"><div class="dot" style="background:var(--closed)"></div>클로징(2.5m↑)</div>
+    </div>
+</div>
+
+<div id="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div id="mDate" class="modal-title"></div>
+        <div id="mStatus" style="font-weight:bold;"></div>
+        <div id="mWave" class="modal-info"></div>
+        <button class="modal-close" onclick="closeModal()">닫기</button>
+    </div>
+</div>
+
+<script>
+    const year = 2026;
+    let currentMonth = new Date().getMonth() + 1;
+
+    function init() {
+        const nav = document.getElementById('monthNav');
+        for(let m=1; m<=12; m++) {
+            const btn = document.createElement('button');
+            btn.className = `m-btn ${m === currentMonth ? 'active' : ''}`;
+            btn.innerText = `${m}월`;
+            btn.onclick = () => {
+                document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderCalendar(m);
+            };
+            nav.appendChild(btn);
+        }
+        renderCalendar(currentMonth);
+    }
+
+    function showDetail(date, timeLabel, waveInfo, statusClass) {
+        document.getElementById('mDate').innerText = `${date} (${timeLabel})`;
+        document.getElementById('mStatus').innerText = statusClass === 'closed' ? '🔴 클로징 상태' : '🟢 오픈 상태';
+        document.getElementById('mStatus').style.color = statusClass === 'closed' ? '#e74c3c' : '#2ecc71';
+        document.getElementById('mWave').innerText = `파고 정보: ${waveInfo}`;
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    async function renderCalendar(month) {
+        const grid = document.getElementById('calendar');
+        // 기존 셀 제거 (헤더 제외)
+        grid.querySelectorAll('.day-cell').forEach(c => c.remove());
+
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        let data = {};
+        try {
+            // [수동 관리용 핵심] 항상 최신 data.json을 불러오기 위해 타임스탬프를 붙입니다.
+            const res = await fetch(`data.json?v=${new Date().getTime()}`);
+            if(res.ok) data = await res.json();
+        } catch(e) {
+            console.error("데이터 로딩 실패:", e);
+        }
+
+        // 시작 공백 셀 생성
+        for(let i=0; i<firstDay; i++) {
+            grid.innerHTML += `<div class="day-cell" style="background:#f9f9f9"></div>`;
+        }
+
+        // 날짜별 셀 생성
+        for(let d=1; d<=daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const records = data[dateStr] || [];
+            
+            let slotsHtml = `<div class="slot-container">`;
+            
+            // "오전", "오후", "종일" 순서대로 체크
+            const periods = [
+                { key: "오전", label: "AM" },
+                { key: "오후", label: "PM" },
+                { key: "종일", label: "종일" }
+            ];
+
+            let hasData = false;
+            periods.forEach(p => {
+                // 수동 입력한 "오전(실적)" 등 텍스트를 포함하고 있는지 확인
+                const record = records.find(r => r.t.includes(p.key));
+                if(record) {
+                    hasData = true;
+                    const isClosed = record.s === "Closed";
+                    const statusClass = isClosed ? 'closed' : 'open';
+                    const emoji = isClosed ? '🔴' : '🟢';
+                    slotsHtml += `<div class="slot ${statusClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${statusClass}')">${emoji} ${p.label}</div>`;
+                }
+            });
+
+            // 데이터가 아예 없는 날은 회색 AM/PM 표시
+            if (!hasData) {
+                slotsHtml += `<div class="slot none">AM</div><div class="slot none">PM</div>`;
+            }
+            
+            slotsHtml += `</div>`;
+
+            grid.innerHTML += `
+                <div class="day-cell">
+                    <div class="day-num">${d}</div>
+                    ${slotsHtml}
+                </div>`;
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
