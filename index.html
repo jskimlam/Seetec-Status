@@ -17,14 +17,18 @@
         .conn-status.online { border: 1px solid var(--open); color: var(--open); }
         .conn-status.fix { border: 1px solid var(--fix); color: var(--fix); }
 
-        /* 픽스패널: 기본 display:none 이지만 active 클래스 시 block */
+        /* 픽스패널: 보안 블록 시 자동 노출 */
         .fix-panel { background: #fff9e6; padding: 15px; border-bottom: 2px solid #ffeaa7; display: none; text-align: center; }
         .fix-panel.active { display: block !important; }
         
-        #authArea { margin-bottom: 10px; }
+        /* 인증 및 입력 영역 */
+        #authArea { display: block; }
         #dataInputArea { display: none; margin-top: 15px; border-top: 1px dashed #f39c12; padding-top: 15px; }
+        
         textarea { width: 90%; height: 100px; font-size: 0.7rem; border-radius: 5px; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
-        input[type="password"] { padding: 10px; border-radius: 5px; border: 1px solid #ddd; width: 180px; margin-bottom: 10px; }
+        input[type="password"] { padding: 10px; border-radius: 5px; border: 1px solid #ddd; width: 180px; margin-bottom: 5px; }
+        .btn-main { padding: 10px 20px; background:#34495e; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
+        .btn-apply { padding: 10px 25px; background:var(--open); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
 
         .month-nav { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 15px; background: #f8f9fa; }
         .m-btn { border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
@@ -48,7 +52,6 @@
         .slot.closed { background: var(--closed); color: #fff; }
 
         .footer { padding: 15px; text-align: center; font-size: 0.75rem; color: #bdc3c7; border-top: 1px solid #eee; }
-
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; }
     </style>
@@ -60,21 +63,26 @@
         <div id="connBadge" class="conn-status">연결 확인 중...</div>
         <h2>🚢 대산항 Seetec 현황판</h2>
         <div class="created-by">Created by JS KIM (LAM)</div>
-        <button onclick="manualToggleFix()" style="background:var(--fix); color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:0.7rem; cursor:pointer; font-weight:bold; margin-top:15px;">보안 블록/픽스모드 강제전환</button>
+        <button onclick="manualToggleFix()" style="background:var(--fix); color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:0.7rem; cursor:pointer; font-weight:bold; margin-top:15px;">픽스모드 메뉴 전환</button>
     </div>
 
     <div id="fixPanel" class="fix-panel">
-        <div id="authArea">
-            <strong style="color:var(--fix)">⚠️ 보안 블록 감지 (픽스모드 활성화)</strong><br>
-            <p style="font-size:0.8rem; margin:10px 0;">데이터 수정을 위해 관리자 비밀번호를 입력하세요.</p>
-            <input type="password" id="adminPw" placeholder="비밀번호 입력">
-            <button onclick="checkAuth()" style="padding:10px 20px; background:#34495e; color:#fff; border:none; border-radius:5px; cursor:pointer;">인증하기</button>
+        <div id="msgArea">
+            <strong style="color:var(--fix)">⚠️ 보안 블록됨 (오프라인 모드)</strong><br>
+            <p style="font-size:0.8rem; margin:10px 0;">온라인 시트 연동이 차단되었습니다. 기존 데이터를 확인하거나 수동으로 수정할 수 있습니다.</p>
+            <button id="btnUnlock" onclick="showAuth()" class="btn-main">🔐 데이터 수정/입력하기</button>
         </div>
+
+        <div id="authArea" style="display:none; margin-top:10px;">
+            <input type="password" id="adminPw" placeholder="관리자 비밀번호">
+            <button onclick="checkAuth()" class="btn-main">인증</button>
+        </div>
+
         <div id="dataInputArea">
             <strong>✅ 관리자 인증 완료</strong><br>
             <p style="font-size:0.75rem">스프레드시트 데이터를 아래에 붙여넣으세요.</p>
             <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식 붙여넣기..."></textarea>
-            <button onclick="applyManualData()" style="padding:10px 25px; background:var(--open); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">데이터 적용</button>
+            <button onclick="applyManualData()" class="btn-apply">데이터 즉시 적용</button>
         </div>
     </div>
 
@@ -91,9 +99,7 @@
         <div class="weekday">수</div><div class="weekday">목</div><div class="weekday">금</div><div class="weekday">토</div>
     </div>
 
-    <div class="footer">
-        © 2026 LAM. All port data verified for Daesan Seetec.
-    </div>
+    <div class="footer">© 2026 LAM. All port data verified for Daesan Seetec.</div>
 </div>
 
 <div id="modal" onclick="closeModal()"><div class="modal-content" onclick="event.stopPropagation()">
@@ -127,26 +133,28 @@
         syncWithGoogleSheets();
     }
 
-    // 보안 블록 감지 시 자동 실행 로직 강화
     async function syncWithGoogleSheets() {
         const badge = document.getElementById('connBadge');
         const panel = document.getElementById('fixPanel');
-        
         try {
             const response = await fetch(sheetCsvUrl);
-            if (!response.ok) throw new Error("Blocked by policy");
+            if (!response.ok) throw new Error("Blocked");
             const csvText = await response.text();
             parseCsvData(csvText);
             badge.innerText = "● 온라인 연결 성공";
             badge.className = "conn-status online";
-            panel.classList.remove('active'); // 연결 성공 시 패널 숨김
+            panel.classList.remove('active');
             renderCalendar(currentMonth);
         } catch (error) {
-            console.log("Security Block detected. Enabling Fix Mode.");
             badge.innerText = "● 보안 블록됨";
             badge.className = "conn-status fix";
-            panel.classList.add('active'); // 패널 즉시 강제 표시
+            panel.classList.add('active'); // 보안 블록 시 픽스패널 자동 오픈
         }
+    }
+
+    function showAuth() {
+        document.getElementById('btnUnlock').style.display = 'none';
+        document.getElementById('authArea').style.display = 'block';
     }
 
     function checkAuth() {
@@ -183,7 +191,7 @@
             }
         });
         renderCalendar(currentMonth);
-        alert("수동 데이터가 성공적으로 반영되었습니다.");
+        alert("수동 데이터가 반영되었습니다.");
     }
 
     function renderCalendar(month) {
@@ -199,41 +207,31 @@
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const records = globalData[dateStr] || [];
             let slotsHtml = `<div class="slot-container">`;
-            
             [{k:"오전", l:"AM"}, {k:"오후", l:"PM"}].forEach(p => {
                 const record = records.find(r => r.t.includes(p.k));
                 if(record) {
                     const status = record.s.trim();
                     const isWaiting = !status || status === "발표대기중" || record.r === "미발표" || record.r === "";
-                    
                     if (!isWaiting) {
-                        total++;
-                        if(status.toLowerCase() === "closed") closed++; else open++;
+                        total++; if(status.toLowerCase() === "closed") closed++; else open++;
                     }
                     const sClass = isWaiting ? 'none' : (status.toLowerCase() === 'closed' ? 'closed' : 'open');
                     const icon = isWaiting ? '⏳' : (status.toLowerCase() === 'closed' ? '🔴' : '🟢');
                     slotsHtml += `<div class="slot ${sClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${status}')">${icon} ${p.l}</div>`;
-                } else {
-                    slotsHtml += `<div class="slot none">---</div>`;
-                }
+                } else { slotsHtml += `<div class="slot none">---</div>`; }
             });
             grid.innerHTML += `<div class="day-cell"><div class="day-num">${d}</div>${slotsHtml}</div>`;
         }
-        updateStats(total, open, closed);
-    }
-
-    function updateStats(t, o, c) {
-        const ratio = t > 0 ? Math.round((o / t) * 100) : 0;
+        const ratio = total > 0 ? Math.round((open / total) * 100) : 0;
         document.getElementById('openRatio').innerText = ratio + "%";
-        document.getElementById('closedCount').innerText = c + "회";
-        document.getElementById('closedRatio').innerText = (t > 0 ? (100 - ratio) : 0) + "%";
+        document.getElementById('closedCount').innerText = closed + "회";
+        document.getElementById('closedRatio').innerText = (total > 0 ? (100 - ratio) : 0) + "%";
     }
 
     function showDetail(d, t, r, s) {
         document.getElementById('mDate').innerText = d + " (" + t + ")";
         const status = s.trim();
         const isWaiting = !status || status === "발표대기중" || r === "미발표" || r === "";
-        
         if (isWaiting) {
             document.getElementById('mStatus').innerText = '⏳ 기상 발표 대기 중';
             document.getElementById('mStatus').style.color = '#7f8c8d';
