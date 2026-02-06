@@ -5,16 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🚢 대산항 Seetec 포트 현황판</title>
     <style>
-        :root { --bg: #f4f7f6; --open: #2ecc71; --closed: #e74c3c; --none: #dfe6e9; --text: #2d3436; }
+        :root { --bg: #f4f7f6; --open: #2ecc71; --closed: #e74c3c; --none: #dfe6e9; --text: #2d3436; --fix: #f39c12; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: var(--text); }
         .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
         
-        .header { background: #34495e; color: #fff; padding: 20px; text-align: center; }
+        /* 헤더 및 상태 배지 */
+        .header { background: #34495e; color: #fff; padding: 20px; text-align: center; position: relative; }
+        .conn-status { position: absolute; top: 10px; right: 15px; font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; background: rgba(0,0,0,0.3); }
+        .conn-status.online { border: 1px solid var(--open); color: var(--open); }
+        .conn-status.fix { border: 1px solid var(--fix); color: var(--fix); }
+
+        /* 보안 픽스모드 패널 */
+        .fix-panel { background: #fff9e6; padding: 15px; border-bottom: 1px solid #ffeaa7; display: none; text-align: center; }
+        .fix-panel.active { display: block; }
+        textarea { width: 90%; height: 80px; margin-top: 10px; font-size: 0.7rem; border-radius: 5px; border: 1px solid #ddd; padding: 10px; }
+
         .month-nav { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 15px; background: #f8f9fa; }
         .m-btn { border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         .m-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
 
-        /* 강화된 통계바 디자인 */
         .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; padding: 15px 5px; border-bottom: 2px solid #f1f2f6; }
         .stat-item { text-align: center; border-right: 1px solid #eee; }
         .stat-item:last-child { border-right: none; }
@@ -23,65 +32,72 @@
 
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
         .weekday { background: #f1f2f6; text-align: center; padding: 10px 0; font-size: 0.8rem; font-weight: bold; border-bottom: 1px solid #eee; }
-        .day-cell { border-right: 1px solid #eee; border-bottom: 1px solid #eee; min-height: 85px; position: relative; background: #fff; }
+        .day-cell { border-right: 1px solid #eee; border-bottom: 1px solid #eee; min-height: 90px; position: relative; background: #fff; }
         .day-num { font-size: 0.75rem; font-weight: bold; padding: 5px; color: #636e72; }
         
-        .slot-container { display: flex; flex-direction: column; height: 60px; gap: 2px; padding: 2px; }
+        .slot-container { display: flex; flex-direction: column; height: 65px; gap: 2px; padding: 2px; }
         .slot { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border-radius: 3px; font-weight: bold; cursor: pointer; }
         .slot.none { background: var(--none); color: #999; cursor: default; }
         .slot.open { background: var(--open); color: #fff; }
         .slot.closed { background: var(--closed); color: #fff; }
 
+        .footer { padding: 20px; text-align: center; font-size: 0.8rem; color: #95a5a6; border-top: 1px solid #eee; background: #fcfcfc; }
+        .creator { font-weight: bold; color: #2c3e50; font-size: 0.9rem; }
+
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .legend { display: flex; justify-content: center; gap: 15px; padding: 15px; font-size: 0.8rem; border-top: 1px solid #eee; }
-        .leg-item { display: flex; align-items: center; gap: 5px; }
-        .dot { width: 12px; height: 12px; border-radius: 3px; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header"><h2>🚢 2026 대산항 포트 현황판</h2></div>
+    <div class="header">
+        <div id="connBadge" class="conn-status">연결 확인 중...</div>
+        <h2>🚢 대산항 Seetec 현황판</h2>
+        <button id="fixToggle" onclick="toggleFixMode()" style="background:var(--fix); color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:0.75rem; cursor:pointer; font-weight:bold;">보안 블록/픽스모드 전환</button>
+    </div>
+
+    <div id="fixPanel" class="fix-panel">
+        <strong>⚠️ 보안 픽스모드 (오프라인 수동 입력)</strong><br>
+        <span style="font-size:0.75rem">구글 시트나 엑셀의 데이터를 복사하여 아래에 붙여넣으세요.</span><br>
+        <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식으로 붙여넣기..."></textarea>
+        <button onclick="applyManualData()" style="margin-top:8px; padding:8px 20px; background:#34495e; color:#fff; border:none; border-radius:4px; cursor:pointer;">데이터 즉시 적용</button>
+    </div>
+
     <div class="month-nav" id="monthNav"></div>
     
-    <div class="stats-bar" id="statsBar">
-        <div class="stat-item">
-            <span class="stat-label">🟢 오픈율</span>
-            <span id="openRatio" class="stat-val" style="color:var(--open)">0%</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">🔴 클로징 횟수</span>
-            <span id="closedCount" class="stat-val" style="color:var(--closed)">0회</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">🚫 클로징 비율</span>
-            <span id="closedRatio" class="stat-val" style="color:var(--closed)">0%</span>
-        </div>
+    <div class="stats-bar">
+        <div class="stat-item"><span class="stat-label">🟢 오픈율</span><span id="openRatio" class="stat-val" style="color:var(--open)">0%</span></div>
+        <div class="stat-item"><span class="stat-label">🔴 클로징 횟수</span><span id="closedCount" class="stat-val" style="color:var(--closed)">0회</span></div>
+        <div class="stat-item"><span class="stat-label">🚫 클로징 비율</span><span id="closedRatio" class="stat-val" style="color:var(--closed)">0%</span></div>
     </div>
 
     <div class="calendar-grid" id="calendar">
         <div class="weekday">일</div><div class="weekday">월</div><div class="weekday">화</div>
         <div class="weekday">수</div><div class="weekday">목</div><div class="weekday">금</div><div class="weekday">토</div>
     </div>
-    <div class="legend">
-        <div class="leg-item"><div class="dot" style="background:var(--open)"></div>오픈</div>
-        <div class="leg-item"><div class="dot" style="background:var(--closed)"></div>클로징(2.5m↑)</div>
+
+    <div class="footer">
+        <p>Created by <span class="creator">JS Kim of LAM</span></p>
+        <p style="font-size: 0.7rem; margin-top: 5px;">© 2026 LAM. All port data verified for Daesan Seetec.</p>
     </div>
 </div>
 
-<div id="modal" onclick="closeModal()">
-    <div class="modal-content" onclick="event.stopPropagation()">
-        <div id="mDate" style="font-weight:bold; margin-bottom:10px;"></div>
-        <div id="mStatus" style="font-weight:bold; font-size:1.2rem;"></div>
-        <div id="mWave" style="font-weight:800; margin:15px 0;"></div>
-        <button onclick="closeModal()" style="padding:10px 20px; cursor:pointer;">닫기</button>
-    </div>
-</div>
+<div id="modal" onclick="closeModal()"><div class="modal-content" onclick="event.stopPropagation()">
+    <div id="mDate" style="font-weight:bold; margin-bottom:10px; color:#7f8c8d;"></div>
+    <div id="mStatus" style="font-weight:bold; font-size:1.3rem;"></div>
+    <div id="mWave" style="font-weight:800; margin:20px 0; font-size:1.1rem;"></div>
+    <button onclick="closeModal()" style="padding:10px 25px; border-radius:5px; border:1px solid #ddd; cursor:pointer;">창 닫기</button>
+</div></div>
 
 <script>
     const year = 2026;
     let currentMonth = new Date().getMonth() + 1;
+    let globalData = {};
+    let isFixMode = false;
+
+    // 구글 시트 CSV 출력 URL
+    const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGrqzEdgECvgskv4CW-1-FdlAXq1ZIYomFapbQidCM8i2avijanfPHgOKk8Ajtyrt8a6VqbSvpT6uN/pub?output=csv";
 
     function init() {
         const nav = document.getElementById('monthNav');
@@ -92,78 +108,115 @@
             btn.onclick = () => {
                 document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
+                currentMonth = m;
                 renderCalendar(m);
             };
             nav.appendChild(btn);
         }
-        renderCalendar(currentMonth);
+        syncWithGoogleSheets();
     }
 
-    async function renderCalendar(month) {
+    async function syncWithGoogleSheets() {
+        const badge = document.getElementById('connBadge');
+        try {
+            const response = await fetch(sheetCsvUrl);
+            if (!response.ok) throw new Error("Network blocked");
+            const csvText = await response.text();
+            parseCsvData(csvText);
+            badge.innerText = "● 온라인 연결 성공";
+            badge.className = "conn-status online";
+            renderCalendar(currentMonth);
+        } catch (error) {
+            badge.innerText = "● 보안 블록 (픽스모드 필요)";
+            badge.className = "conn-status fix";
+            toggleFixMode(true);
+        }
+    }
+
+    function parseCsvData(csv) {
+        const lines = csv.split('\n');
+        globalData = {};
+        for(let i=1; i<lines.length; i++) {
+            const cols = lines[i].split(',');
+            if(cols.length >= 5) {
+                const date = cols[0].trim();
+                if(!globalData[date]) globalData[date] = [];
+                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4].trim() });
+            }
+        }
+    }
+
+    function toggleFixMode(force = null) {
+        isFixMode = force !== null ? force : !isFixMode;
+        document.getElementById('fixPanel').classList.toggle('active', isFixMode);
+    }
+
+    function applyManualData() {
+        const input = document.getElementById('manualData').value;
+        if(!input) return;
+        try {
+            const rows = input.trim().split('\n');
+            rows.forEach(row => {
+                const cols = row.split('\t'); // 엑셀/시트 복사는 탭으로 구분됨
+                if (cols.length >= 4) {
+                    const date = cols[0].trim();
+                    if (!globalData[date]) globalData[date] = [];
+                    // 중복 방지를 위한 간단한 처리
+                    globalData[date] = globalData[date].filter(item => item.t !== cols[1]);
+                    globalData[date].push({ t: cols[1], r: cols[3], s: cols[4] ? cols[4].trim() : (parseFloat(cols[3]) >= 2.5 ? "Closed" : "Open") });
+                }
+            });
+            renderCalendar(currentMonth);
+            alert("픽스모드 데이터가 반영되었습니다.");
+        } catch(e) { alert("데이터 형식이 올바르지 않습니다."); }
+    }
+
+    function renderCalendar(month) {
         const grid = document.getElementById('calendar');
         grid.querySelectorAll('.day-cell').forEach(c => c.remove());
-
         const firstDay = new Date(year, month - 1, 1).getDay();
         const daysInMonth = new Date(year, month, 0).getDate();
         
-        let data = {};
-        try {
-            const res = await fetch(`data.json?v=${new Date().getTime()}`);
-            if(res.ok) data = await res.json();
-        } catch(e) {}
-
-        let totalSlots = 0;
-        let openSlots = 0;
-        let closedSlots = 0;
+        let totalSlots = 0, openSlots = 0, closedSlots = 0;
 
         for(let i=0; i<firstDay; i++) grid.innerHTML += `<div class="day-cell" style="background:#f9f9f9"></div>`;
 
         for(let d=1; d<=daysInMonth; d++) {
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const records = data[dateStr] || [];
+            const records = globalData[dateStr] || [];
             let slotsHtml = `<div class="slot-container">`;
             
-            const periods = [{k:"오전", l:"AM"}, {k:"오후", l:"PM"}, {k:"종일", l:"종일"}];
+            const periods = [{k:"오전", l:"AM"}, {k:"오후", l:"PM"}];
             let hasData = false;
 
             periods.forEach(p => {
                 const record = records.find(r => r.t.includes(p.k));
                 if(record) {
-                    hasData = true;
-                    totalSlots++;
-                    const isClosed = record.s === "Closed";
+                    hasData = true; totalSlots++;
+                    const isClosed = record.s.toLowerCase() === "closed";
                     if(isClosed) closedSlots++; else openSlots++;
-                    
-                    const statusClass = isClosed ? 'closed' : 'open';
-                    slotsHtml += `<div class="slot ${statusClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${statusClass}')">${isClosed?'🔴':'🟢'} ${p.l}</div>`;
+                    slotsHtml += `<div class="slot ${isClosed?'closed':'open'}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${record.s}')">${isClosed?'🔴':'🟢'} ${p.l}</div>`;
                 }
             });
-
             if (!hasData) slotsHtml += `<div class="slot none">AM</div><div class="slot none">PM</div>`;
-            slotsHtml += `</div>`;
             grid.innerHTML += `<div class="day-cell"><div class="day-num">${d}</div>${slotsHtml}</div>`;
         }
+        updateStats(totalSlots, openSlots, closedSlots);
+    }
 
-        // 강화된 통계 계산 및 업데이트
-        if (totalSlots > 0) {
-            const openRatio = Math.round((openSlots / totalSlots) * 100);
-            const closedRatio = 100 - openRatio; // 또는 Math.round((closedSlots / totalSlots) * 100)
-            
-            document.getElementById('openRatio').innerText = openRatio + "%";
-            document.getElementById('closedCount').innerText = closedSlots + "회";
-            document.getElementById('closedRatio').innerText = closedRatio + "%";
-        } else {
-            document.getElementById('openRatio').innerText = "0%";
-            document.getElementById('closedCount').innerText = "0회";
-            document.getElementById('closedRatio').innerText = "0%";
-        }
+    function updateStats(t, o, c) {
+        const ratio = t > 0 ? Math.round((o / t) * 100) : 0;
+        document.getElementById('openRatio').innerText = ratio + "%";
+        document.getElementById('closedCount').innerText = c + "회";
+        document.getElementById('closedRatio').innerText = (t > 0 ? (100 - ratio) : 0) + "%";
     }
 
     function showDetail(d, t, r, s) {
         document.getElementById('mDate').innerText = d + " (" + t + ")";
-        document.getElementById('mStatus').innerText = s === 'closed' ? '🔴 클로징 상태' : '🟢 오픈 상태';
-        document.getElementById('mStatus').style.color = s === 'closed' ? '#e74c3c' : '#2ecc71';
-        document.getElementById('mWave').innerText = "파고: " + r;
+        const isClosed = s.toLowerCase() === 'closed';
+        document.getElementById('mStatus').innerText = isClosed ? '🔴 PORT CLOSED' : '🟢 PORT OPEN';
+        document.getElementById('mStatus').style.color = isClosed ? '#e74c3c' : '#2ecc71';
+        document.getElementById('mWave').innerText = "최대 파고(Max): " + r;
         document.getElementById('modal').style.display = 'flex';
     }
 
