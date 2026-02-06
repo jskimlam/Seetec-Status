@@ -17,13 +17,11 @@
         .conn-status.online { border: 1px solid var(--open); color: var(--open); }
         .conn-status.fix { border: 1px solid var(--fix); color: var(--fix); }
 
-        /* 픽스패널: 보안 블록 시 자동 노출 */
         .fix-panel { background: #fff9e6; padding: 15px; border-bottom: 2px solid #ffeaa7; display: none; text-align: center; }
         .fix-panel.active { display: block !important; }
         
         #authArea { display: none; margin-top: 10px; }
         #dataInputArea { display: none; margin-top: 15px; border-top: 1px dashed #f39c12; padding-top: 15px; }
-        
         textarea { width: 90%; height: 120px; font-size: 0.7rem; border-radius: 5px; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
         input[type="password"] { padding: 10px; border-radius: 5px; border: 1px solid #ddd; width: 180px; margin-bottom: 5px; }
         .btn-main { padding: 10px 20px; background:#34495e; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
@@ -51,8 +49,13 @@
         .slot.closed { background: var(--closed); color: #fff; }
 
         .footer { padding: 15px; text-align: center; font-size: 0.75rem; color: #bdc3c7; border-top: 1px solid #eee; }
+        
+        /* 팝업 모달 강화 */
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; }
+        .wave-detail-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #eee; }
+        .wave-label { font-size: 0.75rem; color: #7f8c8d; margin-bottom: 5px; }
+        .wave-value { font-size: 1.1rem; font-weight: 800; color: #2d3436; }
     </style>
 </head>
 <body>
@@ -67,16 +70,14 @@
 
     <div id="fixPanel" class="fix-panel">
         <div id="msgArea">
-            <strong style="color:var(--fix)">⚠️ 보안 블록됨 (오프라인/로컬 데이터 사용 중)</strong><br>
-            <p style="font-size:0.8rem; margin:10px 0;">브라우저에 저장된 데이터를 불러왔습니다. 수정하려면 비밀번호가 필요합니다.</p>
+            <strong style="color:var(--fix)">⚠️ 보안 블록됨 (로컬 데이터 사용 중)</strong><br>
+            <p style="font-size:0.8rem; margin:10px 0;">브라우저 저장 데이터를 사용합니다. 수정 시 비밀번호가 필요합니다.</p>
             <button id="btnUnlock" onclick="showAuth()" class="btn-main">🔐 데이터 수정/재업로드</button>
         </div>
-
         <div id="authArea">
             <input type="password" id="adminPw" placeholder="관리자 비밀번호">
             <button onclick="checkAuth()" class="btn-main">인증</button>
         </div>
-
         <div id="dataInputArea">
             <strong>✅ 인증 완료: 스프레드시트 데이터 붙여넣기</strong><br>
             <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식 붙여넣기..."></textarea>
@@ -103,7 +104,18 @@
 <div id="modal" onclick="closeModal()"><div class="modal-content" onclick="event.stopPropagation()">
     <div id="mDate" style="font-weight:bold; margin-bottom:10px; color:#7f8c8d;"></div>
     <div id="mStatus" style="font-weight:bold; font-size:1.3rem;"></div>
-    <div id="mWave" style="font-weight:800; margin:20px 0; font-size:1.1rem;"></div>
+    
+    <div class="wave-detail-box" id="waveBox">
+        <div>
+            <div class="wave-label">최저 파고(Min)</div>
+            <div id="mLow" class="wave-value">-</div>
+        </div>
+        <div>
+            <div class="wave-label">최고 파고(Max)</div>
+            <div id="mHigh" class="wave-value">-</div>
+        </div>
+    </div>
+    
     <button onclick="closeModal()" style="padding:10px 25px; border-radius:5px; border:1px solid #ddd; cursor:pointer;">창 닫기</button>
 </div></div>
 
@@ -115,7 +127,6 @@
     const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGrqzEdgECvgskv4CW-1-FdlAXq1ZIYomFapbQidCM8i2avijanfPHgOKk8Ajtyrt8a6VqbSvpT6uN/pub?output=csv";
 
     function init() {
-        // 1. 달력 네비게이션 생성
         const nav = document.getElementById('monthNav');
         for(let m=1; m<=12; m++) {
             const btn = document.createElement('button');
@@ -130,14 +141,8 @@
             nav.appendChild(btn);
         }
 
-        // 2. 로컬 저장소에서 기존 데이터 로드 (핵심 수정 사항)
         const savedData = localStorage.getItem('daesan_fix_data');
-        if (savedData) {
-            console.log("로컬 데이터 로드 완료");
-            processDataText(savedData);
-        }
-
-        // 3. 온라인 시트 동기화 시도
+        if (savedData) processDataText(savedData);
         syncWithGoogleSheets();
     }
 
@@ -146,7 +151,7 @@
         const panel = document.getElementById('fixPanel');
         try {
             const response = await fetch(sheetCsvUrl);
-            if (!response.ok) throw new Error("Blocked");
+            if (!response.ok) throw new Error();
             const csvText = await response.text();
             parseCsvData(csvText);
             badge.innerText = "● 온라인 연결 성공";
@@ -156,45 +161,24 @@
         } catch (error) {
             badge.innerText = "● 보안 블록됨";
             badge.className = "conn-status fix";
-            panel.classList.add('active'); // 보안 블록 시 픽스패널 자동 노출
-            renderCalendar(currentMonth); // 저장된 데이터가 있다면 그것으로 렌더링
+            panel.classList.add('active');
+            renderCalendar(currentMonth);
         }
     }
 
-    // 수정 모드 진입 시 비밀번호 확인 전 단계
-    function showAuth() {
-        document.getElementById('msgArea').style.display = 'none';
-        document.getElementById('authArea').style.display = 'block';
+    function parseCsvData(csv) {
+        const lines = csv.split('\n');
+        globalData = {};
+        for(let i=1; i<lines.length; i++) {
+            const cols = lines[i].split(',');
+            if(cols.length >= 5) {
+                const date = cols[0].trim();
+                if(!globalData[date]) globalData[date] = [];
+                globalData[date].push({ t: cols[1], low: cols[2], high: cols[3], s: cols[4].trim() });
+            }
+        }
     }
 
-    function checkAuth() {
-        if (document.getElementById('adminPw').value === MASTER_PW) {
-            document.getElementById('authArea').style.display = 'none';
-            document.getElementById('dataInputArea').style.display = 'block';
-            // 기존에 입력했던 텍스트가 있다면 텍스트에어리어에 다시 채워줌
-            const raw = localStorage.getItem('daesan_fix_data');
-            if(raw) document.getElementById('manualData').value = raw;
-        } else { alert("비밀번호가 일치하지 않습니다."); }
-    }
-
-    function applyManualData() {
-        const input = document.getElementById('manualData').value;
-        if(!input) return;
-        
-        // 로컬 저장소에 저장 (브라우저가 기억하게 함)
-        localStorage.setItem('daesan_fix_data', input);
-        
-        processDataText(input);
-        renderCalendar(currentMonth);
-        alert("데이터가 브라우저에 안전하게 저장되었습니다.");
-        
-        // 입력창 닫고 안내문구로 복구
-        document.getElementById('dataInputArea').style.display = 'none';
-        document.getElementById('msgArea').style.display = 'block';
-        document.getElementById('adminPw').value = "";
-    }
-
-    // 텍스트 데이터를 globalData 객체로 변환하는 공통 함수
     function processDataText(text) {
         const rows = text.trim().split('\n');
         rows.forEach(row => {
@@ -203,22 +187,9 @@
                 const date = cols[0].trim();
                 if (!globalData[date]) globalData[date] = [];
                 globalData[date] = globalData[date].filter(item => item.t !== cols[1]);
-                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4] ? cols[4].trim() : "" });
+                globalData[date].push({ t: cols[1], low: cols[2] || cols[3], high: cols[3], s: cols[4] ? cols[4].trim() : "" });
             }
         });
-    }
-
-    function parseCsvData(csv) {
-        const lines = csv.split('\n');
-        globalData = {}; // 온라인 성공 시 초기화 후 덮어쓰기
-        for(let i=1; i<lines.length; i++) {
-            const cols = lines[i].split(',');
-            if(cols.length >= 5) {
-                const date = cols[0].trim();
-                if(!globalData[date]) globalData[date] = [];
-                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4].trim() });
-            }
-        }
     }
 
     function renderCalendar(month) {
@@ -238,40 +209,60 @@
                 const record = records.find(r => r.t.includes(p.k));
                 if(record) {
                     const status = record.s.trim();
-                    const isWaiting = !status || status === "발표대기중" || record.r === "미발표" || record.r === "";
+                    const isWaiting = !status || status === "발표대기중" || record.high === "미발표" || record.high === "";
                     if (!isWaiting) {
                         total++; if(status.toLowerCase() === "closed") closed++; else open++;
                     }
                     const sClass = isWaiting ? 'none' : (status.toLowerCase() === 'closed' ? 'closed' : 'open');
                     const icon = isWaiting ? '⏳' : (status.toLowerCase() === 'closed' ? '🔴' : '🟢');
-                    slotsHtml += `<div class="slot ${sClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${status}')">${icon} ${p.l}</div>`;
+                    slotsHtml += `<div class="slot ${sClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.low}', '${record.high}', '${status}')">${icon} ${p.l}</div>`;
                 } else { slotsHtml += `<div class="slot none">---</div>`; }
             });
             grid.innerHTML += `<div class="day-cell"><div class="day-num">${d}</div>${slotsHtml}</div>`;
         }
-        const ratio = total > 0 ? Math.round((open / total) * 100) : 0;
-        document.getElementById('openRatio').innerText = ratio + "%";
-        document.getElementById('closedCount').innerText = closed + "회";
-        document.getElementById('closedRatio').innerText = (total > 0 ? (100 - ratio) : 0) + "%";
+        updateStats(total, open, closed);
     }
 
-    function showDetail(d, t, r, s) {
+    function updateStats(t, o, c) {
+        const ratio = t > 0 ? Math.round((o / t) * 100) : 0;
+        document.getElementById('openRatio').innerText = ratio + "%";
+        document.getElementById('closedCount').innerText = c + "회";
+        document.getElementById('closedRatio').innerText = (t > 0 ? (100 - ratio) : 0) + "%";
+    }
+
+    function showDetail(d, t, low, high, s) {
         document.getElementById('mDate').innerText = d + " (" + t + ")";
         const status = s.trim();
-        const isWaiting = !status || status === "발표대기중" || r === "미발표" || r === "";
+        const isWaiting = !status || status === "발표대기중" || high === "미발표" || high === "";
+        
         if (isWaiting) {
             document.getElementById('mStatus').innerText = '⏳ 기상 발표 대기 중';
             document.getElementById('mStatus').style.color = '#7f8c8d';
-            document.getElementById('mWave').innerText = "상세 정보가 아직 발표되지 않았습니다.";
+            document.getElementById('mLow').innerText = "-";
+            document.getElementById('mHigh').innerText = "-";
         } else {
             const isClosed = status.toLowerCase() === 'closed';
             document.getElementById('mStatus').innerText = isClosed ? '🔴 PORT CLOSED' : '🟢 PORT OPEN';
             document.getElementById('mStatus').style.color = isClosed ? '#e74c3c' : '#2ecc71';
-            document.getElementById('mWave').innerText = "최대 파고(Max): " + r;
+            document.getElementById('mLow').innerText = low + (low.includes('m') ? '' : 'm');
+            document.getElementById('mHigh').innerText = high + (high.includes('m') ? '' : 'm');
         }
         document.getElementById('modal').style.display = 'flex';
     }
 
+    function applyManualData() {
+        const input = document.getElementById('manualData').value;
+        if(!input) return;
+        localStorage.setItem('daesan_fix_data', input);
+        processDataText(input);
+        renderCalendar(currentMonth);
+        alert("데이터 저장 완료");
+        document.getElementById('dataInputArea').style.display = 'none';
+        document.getElementById('msgArea').style.display = 'block';
+    }
+
+    function showAuth() { document.getElementById('msgArea').style.display = 'none'; document.getElementById('authArea').style.display = 'block'; }
+    function checkAuth() { if (document.getElementById('adminPw').value === MASTER_PW) { document.getElementById('authArea').style.display = 'none'; document.getElementById('dataInputArea').style.display = 'block'; } else { alert("비밀번호 오류"); } }
     function manualToggleFix() { document.getElementById('fixPanel').classList.toggle('active'); }
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     window.onload = init;
