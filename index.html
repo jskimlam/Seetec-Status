@@ -14,7 +14,6 @@
         .conn-status.online { border: 1px solid var(--open); color: var(--open); }
         .conn-status.fix { border: 1px solid var(--fix); color: var(--fix); }
 
-        /* 보안 픽스모드 및 암호화 패널 */
         .fix-panel { background: #fff9e6; padding: 15px; border-bottom: 1px solid #ffeaa7; display: none; text-align: center; }
         .fix-panel.active { display: block; }
         #authArea { margin-bottom: 10px; }
@@ -39,7 +38,7 @@
         
         .slot-container { display: flex; flex-direction: column; height: 65px; gap: 2px; padding: 2px; }
         .slot { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border-radius: 3px; font-weight: bold; cursor: pointer; }
-        .slot.none { background: var(--none); color: #999; cursor: default; }
+        .slot.none { background: var(--none); color: #999; }
         .slot.open { background: var(--open); color: #fff; }
         .slot.closed { background: var(--closed); color: #fff; }
 
@@ -62,16 +61,13 @@
     <div id="fixPanel" class="fix-panel">
         <div id="authArea">
             <strong>🔐 관리자 인증</strong><br>
-            <span style="font-size:0.75rem">픽스모드 활성화를 위해 비밀번호를 입력하세요.</span><br><br>
             <input type="password" id="adminPw" placeholder="비밀번호 입력">
-            <button onclick="checkAuth()" style="padding:8px 15px; cursor:pointer;">인증하기</button>
+            <button onclick="checkAuth()" style="padding:8px 15px; cursor:pointer;">인증</button>
         </div>
-
         <div id="dataInputArea">
-            <strong>✅ 인증 완료: 데이터 수동 입력</strong><br>
-            <span style="font-size:0.75rem">스프레드시트 데이터를 아래에 붙여넣으세요.</span><br>
-            <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식으로 붙여넣기..."></textarea>
-            <button onclick="applyManualData()" style="margin-top:8px; padding:8px 20px; background:#34495e; color:#fff; border:none; border-radius:4px; cursor:pointer;">데이터 즉시 적용</button>
+            <strong>✅ 인증 완료</strong><br>
+            <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식 붙여넣기..."></textarea>
+            <button onclick="applyManualData()" style="margin-top:8px; padding:8px 20px; background:#34495e; color:#fff; border:none; border-radius:4px; cursor:pointer;">적용</button>
         </div>
     </div>
 
@@ -90,7 +86,6 @@
 
     <div class="footer">
         <p>Created by <span class="creator">JS Kim of LAM</span></p>
-        <p style="font-size: 0.7rem; margin-top: 5px;">© 2026 LAM. All port data verified for Daesan Seetec.</p>
     </div>
 </div>
 
@@ -98,16 +93,14 @@
     <div id="mDate" style="font-weight:bold; margin-bottom:10px; color:#7f8c8d;"></div>
     <div id="mStatus" style="font-weight:bold; font-size:1.3rem;"></div>
     <div id="mWave" style="font-weight:800; margin:20px 0; font-size:1.1rem;"></div>
-    <button onclick="closeModal()" style="padding:10px 25px; border-radius:5px; border:1px solid #ddd; cursor:pointer;">창 닫기</button>
+    <button onclick="closeModal()" style="padding:10px 25px; border-radius:5px; border:1px solid #ddd; cursor:pointer;">닫기</button>
 </div></div>
 
 <script>
     const year = 2026;
     let currentMonth = new Date().getMonth() + 1;
     let globalData = {};
-    let isFixMode = false;
-    const MASTER_PW = "jskim0111"; // 지정하신 비밀번호
-
+    const MASTER_PW = "jskim0111";
     const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGrqzEdgECvgskv4CW-1-FdlAXq1ZIYomFapbQidCM8i2avijanfPHgOKk8Ajtyrt8a6VqbSvpT6uN/pub?output=csv";
 
     function init() {
@@ -127,22 +120,17 @@
         syncWithGoogleSheets();
     }
 
-    // 비밀번호 체크 로직
     function checkAuth() {
-        const pw = document.getElementById('adminPw').value;
-        if (pw === MASTER_PW) {
+        if (document.getElementById('adminPw').value === MASTER_PW) {
             document.getElementById('authArea').style.display = 'none';
             document.getElementById('dataInputArea').style.display = 'block';
-        } else {
-            alert("비밀번호가 틀렸습니다.");
-        }
+        } else { alert("비밀번호 오류"); }
     }
 
     async function syncWithGoogleSheets() {
         const badge = document.getElementById('connBadge');
         try {
             const response = await fetch(sheetCsvUrl);
-            if (!response.ok) throw new Error("Blocked");
             const csvText = await response.text();
             parseCsvData(csvText);
             badge.innerText = "● 온라인 연결 성공";
@@ -151,7 +139,7 @@
         } catch (error) {
             badge.innerText = "● 보안 블록됨";
             badge.className = "conn-status fix";
-            toggleFixMode(true);
+            document.getElementById('fixPanel').classList.add('active');
         }
     }
 
@@ -168,34 +156,20 @@
         }
     }
 
-    function toggleFixMode(force = null) {
-        isFixMode = force !== null ? force : !isFixMode;
-        document.getElementById('fixPanel').classList.toggle('active', isFixMode);
-        // 패널을 닫을 때 인증 정보 초기화 (선택 사항)
-        if(!isFixMode) {
-            document.getElementById('adminPw').value = "";
-            document.getElementById('authArea').style.display = 'block';
-            document.getElementById('dataInputArea').style.display = 'none';
-        }
-    }
-
     function applyManualData() {
         const input = document.getElementById('manualData').value;
-        if(!input) return;
-        try {
-            const rows = input.trim().split('\n');
-            rows.forEach(row => {
-                const cols = row.split('\t');
-                if (cols.length >= 4) {
-                    const date = cols[0].trim();
-                    if (!globalData[date]) globalData[date] = [];
-                    globalData[date] = globalData[date].filter(item => item.t !== cols[1]);
-                    globalData[date].push({ t: cols[1], r: cols[3], s: cols[4] ? cols[4].trim() : (parseFloat(cols[3]) >= 2.5 ? "Closed" : "Open") });
-                }
-            });
-            renderCalendar(currentMonth);
-            alert("데이터가 반영되었습니다.");
-        } catch(e) { alert("데이터 형식이 올바르지 않습니다."); }
+        const rows = input.trim().split('\n');
+        rows.forEach(row => {
+            const cols = row.split('\t');
+            if (cols.length >= 4) {
+                const date = cols[0].trim();
+                if (!globalData[date]) globalData[date] = [];
+                globalData[date] = globalData[date].filter(item => item.t !== cols[1]);
+                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4] ? cols[4].trim() : "" });
+            }
+        });
+        renderCalendar(currentMonth);
+        alert("반영 완료");
     }
 
     function renderCalendar(month) {
@@ -203,8 +177,7 @@
         grid.querySelectorAll('.day-cell').forEach(c => c.remove());
         const firstDay = new Date(year, month - 1, 1).getDay();
         const daysInMonth = new Date(year, month, 0).getDate();
-        
-        let totalSlots = 0, openSlots = 0, closedSlots = 0;
+        let total = 0, open = 0, closed = 0;
 
         for(let i=0; i<firstDay; i++) grid.innerHTML += `<div class="day-cell" style="background:#f9f9f9"></div>`;
 
@@ -213,40 +186,52 @@
             const records = globalData[dateStr] || [];
             let slotsHtml = `<div class="slot-container">`;
             
-            const periods = [{k:"오전", l:"AM"}, {k:"오후", l:"PM"}];
-            let hasData = false;
-
-            periods.forEach(p => {
+            [{k:"오전", l:"AM"}, {k:"오후", l:"PM"}].forEach(p => {
                 const record = records.find(r => r.t.includes(p.k));
                 if(record) {
-                    hasData = true; totalSlots++;
-                    const isClosed = record.s.toLowerCase() === "closed";
-                    if(isClosed) closedSlots++; else openSlots++;
-                    slotsHtml += `<div class="slot ${isClosed?'closed':'open'}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${record.s}')">${isClosed?'🔴':'🟢'} ${p.l}</div>`;
+                    const status = record.s.trim();
+                    const isWaiting = !status || status === "발표대기중" || record.r === "미발표";
+                    
+                    if (!isWaiting) {
+                        total++;
+                        if(status.toLowerCase() === "closed") closed++; else open++;
+                    }
+
+                    const sClass = isWaiting ? 'none' : (status.toLowerCase() === 'closed' ? 'closed' : 'open');
+                    const icon = isWaiting ? '⏳' : (status.toLowerCase() === 'closed' ? '🔴' : '🟢');
+                    
+                    slotsHtml += `<div class="slot ${sClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.r}', '${status}')">${icon} ${p.l}</div>`;
+                } else {
+                    slotsHtml += `<div class="slot none">---</div>`;
                 }
             });
-            if (!hasData) slotsHtml += `<div class="slot none">AM</div><div class="slot none">PM</div>`;
             grid.innerHTML += `<div class="day-cell"><div class="day-num">${d}</div>${slotsHtml}</div>`;
         }
-        updateStats(totalSlots, openSlots, closedSlots);
-    }
-
-    function updateStats(t, o, c) {
-        const ratio = t > 0 ? Math.round((o / t) * 100) : 0;
+        const ratio = total > 0 ? Math.round((open / total) * 100) : 0;
         document.getElementById('openRatio').innerText = ratio + "%";
-        document.getElementById('closedCount').innerText = c + "회";
-        document.getElementById('closedRatio').innerText = (t > 0 ? (100 - ratio) : 0) + "%";
+        document.getElementById('closedCount').innerText = closed + "회";
+        document.getElementById('closedRatio').innerText = (total > 0 ? (100 - ratio) : 0) + "%";
     }
 
     function showDetail(d, t, r, s) {
         document.getElementById('mDate').innerText = d + " (" + t + ")";
-        const isClosed = s.toLowerCase() === 'closed';
-        document.getElementById('mStatus').innerText = isClosed ? '🔴 PORT CLOSED' : '🟢 PORT OPEN';
-        document.getElementById('mStatus').style.color = isClosed ? '#e74c3c' : '#2ecc71';
-        document.getElementById('mWave').innerText = "최대 파고(Max): " + r;
+        const status = s.trim();
+        const isWaiting = !status || status === "발표대기중" || r === "미발표";
+        
+        if (isWaiting) {
+            document.getElementById('mStatus').innerText = '⏳ 기상 발표 대기 중';
+            document.getElementById('mStatus').style.color = '#7f8c8d';
+            document.getElementById('mWave').innerText = "상세 정보가 아직 없습니다.";
+        } else {
+            const isClosed = status.toLowerCase() === 'closed';
+            document.getElementById('mStatus').innerText = isClosed ? '🔴 PORT CLOSED' : '🟢 PORT OPEN';
+            document.getElementById('mStatus').style.color = isClosed ? '#e74c3c' : '#2ecc71';
+            document.getElementById('mWave').innerText = "최대 파고(Max): " + r;
+        }
         document.getElementById('modal').style.display = 'flex';
     }
 
+    function toggleFixMode() { document.getElementById('fixPanel').classList.toggle('active'); }
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     window.onload = init;
 </script>
