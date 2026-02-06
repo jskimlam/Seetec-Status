@@ -21,11 +21,10 @@
         .fix-panel { background: #fff9e6; padding: 15px; border-bottom: 2px solid #ffeaa7; display: none; text-align: center; }
         .fix-panel.active { display: block !important; }
         
-        /* 인증 및 입력 영역 */
-        #authArea { display: block; }
+        #authArea { display: none; margin-top: 10px; }
         #dataInputArea { display: none; margin-top: 15px; border-top: 1px dashed #f39c12; padding-top: 15px; }
         
-        textarea { width: 90%; height: 100px; font-size: 0.7rem; border-radius: 5px; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        textarea { width: 90%; height: 120px; font-size: 0.7rem; border-radius: 5px; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
         input[type="password"] { padding: 10px; border-radius: 5px; border: 1px solid #ddd; width: 180px; margin-bottom: 5px; }
         .btn-main { padding: 10px 20px; background:#34495e; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
         .btn-apply { padding: 10px 25px; background:var(--open); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
@@ -63,26 +62,25 @@
         <div id="connBadge" class="conn-status">연결 확인 중...</div>
         <h2>🚢 대산항 Seetec 현황판</h2>
         <div class="created-by">Created by JS KIM (LAM)</div>
-        <button onclick="manualToggleFix()" style="background:var(--fix); color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:0.7rem; cursor:pointer; font-weight:bold; margin-top:15px;">픽스모드 메뉴 전환</button>
+        <button onclick="manualToggleFix()" style="background:var(--fix); color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:0.7rem; cursor:pointer; font-weight:bold; margin-top:15px;">픽스모드 메뉴 설정</button>
     </div>
 
     <div id="fixPanel" class="fix-panel">
         <div id="msgArea">
-            <strong style="color:var(--fix)">⚠️ 보안 블록됨 (오프라인 모드)</strong><br>
-            <p style="font-size:0.8rem; margin:10px 0;">온라인 시트 연동이 차단되었습니다. 기존 데이터를 확인하거나 수동으로 수정할 수 있습니다.</p>
-            <button id="btnUnlock" onclick="showAuth()" class="btn-main">🔐 데이터 수정/입력하기</button>
+            <strong style="color:var(--fix)">⚠️ 보안 블록됨 (오프라인/로컬 데이터 사용 중)</strong><br>
+            <p style="font-size:0.8rem; margin:10px 0;">브라우저에 저장된 데이터를 불러왔습니다. 수정하려면 비밀번호가 필요합니다.</p>
+            <button id="btnUnlock" onclick="showAuth()" class="btn-main">🔐 데이터 수정/재업로드</button>
         </div>
 
-        <div id="authArea" style="display:none; margin-top:10px;">
+        <div id="authArea">
             <input type="password" id="adminPw" placeholder="관리자 비밀번호">
             <button onclick="checkAuth()" class="btn-main">인증</button>
         </div>
 
         <div id="dataInputArea">
-            <strong>✅ 관리자 인증 완료</strong><br>
-            <p style="font-size:0.75rem">스프레드시트 데이터를 아래에 붙여넣으세요.</p>
+            <strong>✅ 인증 완료: 스프레드시트 데이터 붙여넣기</strong><br>
             <textarea id="manualData" placeholder="날짜	시간	Low	High	Status 형식 붙여넣기..."></textarea>
-            <button onclick="applyManualData()" class="btn-apply">데이터 즉시 적용</button>
+            <button onclick="applyManualData()" class="btn-apply">저장 및 달력 반영</button>
         </div>
     </div>
 
@@ -117,6 +115,7 @@
     const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSGrqzEdgECvgskv4CW-1-FdlAXq1ZIYomFapbQidCM8i2avijanfPHgOKk8Ajtyrt8a6VqbSvpT6uN/pub?output=csv";
 
     function init() {
+        // 1. 달력 네비게이션 생성
         const nav = document.getElementById('monthNav');
         for(let m=1; m<=12; m++) {
             const btn = document.createElement('button');
@@ -130,6 +129,15 @@
             };
             nav.appendChild(btn);
         }
+
+        // 2. 로컬 저장소에서 기존 데이터 로드 (핵심 수정 사항)
+        const savedData = localStorage.getItem('daesan_fix_data');
+        if (savedData) {
+            console.log("로컬 데이터 로드 완료");
+            processDataText(savedData);
+        }
+
+        // 3. 온라인 시트 동기화 시도
         syncWithGoogleSheets();
     }
 
@@ -148,12 +156,14 @@
         } catch (error) {
             badge.innerText = "● 보안 블록됨";
             badge.className = "conn-status fix";
-            panel.classList.add('active'); // 보안 블록 시 픽스패널 자동 오픈
+            panel.classList.add('active'); // 보안 블록 시 픽스패널 자동 노출
+            renderCalendar(currentMonth); // 저장된 데이터가 있다면 그것으로 렌더링
         }
     }
 
+    // 수정 모드 진입 시 비밀번호 확인 전 단계
     function showAuth() {
-        document.getElementById('btnUnlock').style.display = 'none';
+        document.getElementById('msgArea').style.display = 'none';
         document.getElementById('authArea').style.display = 'block';
     }
 
@@ -161,26 +171,32 @@
         if (document.getElementById('adminPw').value === MASTER_PW) {
             document.getElementById('authArea').style.display = 'none';
             document.getElementById('dataInputArea').style.display = 'block';
+            // 기존에 입력했던 텍스트가 있다면 텍스트에어리어에 다시 채워줌
+            const raw = localStorage.getItem('daesan_fix_data');
+            if(raw) document.getElementById('manualData').value = raw;
         } else { alert("비밀번호가 일치하지 않습니다."); }
-    }
-
-    function parseCsvData(csv) {
-        const lines = csv.split('\n');
-        globalData = {};
-        for(let i=1; i<lines.length; i++) {
-            const cols = lines[i].split(',');
-            if(cols.length >= 5) {
-                const date = cols[0].trim();
-                if(!globalData[date]) globalData[date] = [];
-                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4].trim() });
-            }
-        }
     }
 
     function applyManualData() {
         const input = document.getElementById('manualData').value;
         if(!input) return;
-        const rows = input.trim().split('\n');
+        
+        // 로컬 저장소에 저장 (브라우저가 기억하게 함)
+        localStorage.setItem('daesan_fix_data', input);
+        
+        processDataText(input);
+        renderCalendar(currentMonth);
+        alert("데이터가 브라우저에 안전하게 저장되었습니다.");
+        
+        // 입력창 닫고 안내문구로 복구
+        document.getElementById('dataInputArea').style.display = 'none';
+        document.getElementById('msgArea').style.display = 'block';
+        document.getElementById('adminPw').value = "";
+    }
+
+    // 텍스트 데이터를 globalData 객체로 변환하는 공통 함수
+    function processDataText(text) {
+        const rows = text.trim().split('\n');
         rows.forEach(row => {
             const cols = row.split('\t');
             if (cols.length >= 4) {
@@ -190,8 +206,19 @@
                 globalData[date].push({ t: cols[1], r: cols[3], s: cols[4] ? cols[4].trim() : "" });
             }
         });
-        renderCalendar(currentMonth);
-        alert("수동 데이터가 반영되었습니다.");
+    }
+
+    function parseCsvData(csv) {
+        const lines = csv.split('\n');
+        globalData = {}; // 온라인 성공 시 초기화 후 덮어쓰기
+        for(let i=1; i<lines.length; i++) {
+            const cols = lines[i].split(',');
+            if(cols.length >= 5) {
+                const date = cols[0].trim();
+                if(!globalData[date]) globalData[date] = [];
+                globalData[date].push({ t: cols[1], r: cols[3], s: cols[4].trim() });
+            }
+        }
     }
 
     function renderCalendar(month) {
