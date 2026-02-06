@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🚢 대산항 Seetec 포트 현황판</title>
     <style>
-        :root { --bg: #f4f7f6; --open: #2ecc71; --closed: #e74c3c; --none: #dfe6e9; --text: #2d3436; --fix: #f39c12; }
+        :root { 
+            --bg: #f4f7f6; 
+            --open: #2ecc71; 
+            --closed: #e74c3c; 
+            --heavy-closed: #941a1a; /* 4m 이상: 진한 빨강 */
+            --none: #dfe6e9; 
+            --text: #2d3436; 
+            --fix: #f39c12; 
+        }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: var(--text); }
         .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
         
@@ -47,10 +55,10 @@
         .slot.none { background: var(--none); color: #999; }
         .slot.open { background: var(--open); color: #fff; }
         .slot.closed { background: var(--closed); color: #fff; }
+        .slot.heavy-closed { background: var(--heavy-closed); color: #fff; text-shadow: 0 0 3px rgba(0,0,0,0.5); }
 
         .footer { padding: 15px; text-align: center; font-size: 0.75rem; color: #bdc3c7; border-top: 1px solid #eee; }
         
-        /* 팝업 모달 강화 */
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: #fff; padding: 25px; border-radius: 15px; text-align: center; width: 85%; max-width: 300px; }
         .wave-detail-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #eee; }
@@ -104,18 +112,10 @@
 <div id="modal" onclick="closeModal()"><div class="modal-content" onclick="event.stopPropagation()">
     <div id="mDate" style="font-weight:bold; margin-bottom:10px; color:#7f8c8d;"></div>
     <div id="mStatus" style="font-weight:bold; font-size:1.3rem;"></div>
-    
     <div class="wave-detail-box" id="waveBox">
-        <div>
-            <div class="wave-label">최저 파고(Min)</div>
-            <div id="mLow" class="wave-value">-</div>
-        </div>
-        <div>
-            <div class="wave-label">최고 파고(Max)</div>
-            <div id="mHigh" class="wave-value">-</div>
-        </div>
+        <div><div class="wave-label">최저 파고(Min)</div><div id="mLow" class="wave-value">-</div></div>
+        <div><div class="wave-label">최고 파고(Max)</div><div id="mHigh" class="wave-value">-</div></div>
     </div>
-    
     <button onclick="closeModal()" style="padding:10px 25px; border-radius:5px; border:1px solid #ddd; cursor:pointer;">창 닫기</button>
 </div></div>
 
@@ -140,7 +140,6 @@
             };
             nav.appendChild(btn);
         }
-
         const savedData = localStorage.getItem('daesan_fix_data');
         if (savedData) processDataText(savedData);
         syncWithGoogleSheets();
@@ -151,7 +150,6 @@
         const panel = document.getElementById('fixPanel');
         try {
             const response = await fetch(sheetCsvUrl);
-            if (!response.ok) throw new Error();
             const csvText = await response.text();
             parseCsvData(csvText);
             badge.innerText = "● 온라인 연결 성공";
@@ -209,11 +207,24 @@
                 const record = records.find(r => r.t.includes(p.k));
                 if(record) {
                     const status = record.s.trim();
-                    const isWaiting = !status || status === "발표대기중" || record.high === "미발표" || record.high === "";
+                    const highVal = parseFloat(record.high.replace(/m/g, ''));
+                    const isWaiting = !status || status === "발표대기중" || isNaN(highVal);
+                    
                     if (!isWaiting) {
-                        total++; if(status.toLowerCase() === "closed") closed++; else open++;
+                        total++;
+                        if(status.toLowerCase() === "closed") closed++; else open++;
                     }
-                    const sClass = isWaiting ? 'none' : (status.toLowerCase() === 'closed' ? 'closed' : 'open');
+
+                    // 색상 결정 로직 (4m 이상은 heavy-closed)
+                    let sClass = 'none';
+                    if(!isWaiting) {
+                        if(status.toLowerCase() === 'closed') {
+                            sClass = (highVal >= 4.0) ? 'heavy-closed' : 'closed';
+                        } else {
+                            sClass = 'open';
+                        }
+                    }
+
                     const icon = isWaiting ? '⏳' : (status.toLowerCase() === 'closed' ? '🔴' : '🟢');
                     slotsHtml += `<div class="slot ${sClass}" onclick="showDetail('${dateStr}', '${record.t}', '${record.low}', '${record.high}', '${status}')">${icon} ${p.l}</div>`;
                 } else { slotsHtml += `<div class="slot none">---</div>`; }
@@ -233,7 +244,8 @@
     function showDetail(d, t, low, high, s) {
         document.getElementById('mDate').innerText = d + " (" + t + ")";
         const status = s.trim();
-        const isWaiting = !status || status === "발표대기중" || high === "미발표" || high === "";
+        const highVal = parseFloat(high.replace(/m/g, ''));
+        const isWaiting = !status || status === "발표대기중" || isNaN(highVal);
         
         if (isWaiting) {
             document.getElementById('mStatus').innerText = '⏳ 기상 발표 대기 중';
@@ -242,8 +254,9 @@
             document.getElementById('mHigh').innerText = "-";
         } else {
             const isClosed = status.toLowerCase() === 'closed';
-            document.getElementById('mStatus').innerText = isClosed ? '🔴 PORT CLOSED' : '🟢 PORT OPEN';
-            document.getElementById('mStatus').style.color = isClosed ? '#e74c3c' : '#2ecc71';
+            const isHeavy = highVal >= 4.0;
+            document.getElementById('mStatus').innerText = isClosed ? (isHeavy ? '🚨 HEAVY CLOSED' : '🔴 PORT CLOSED') : '🟢 PORT OPEN';
+            document.getElementById('mStatus').style.color = isClosed ? (isHeavy ? '#941a1a' : '#e74c3c') : '#2ecc71';
             document.getElementById('mLow').innerText = low + (low.includes('m') ? '' : 'm');
             document.getElementById('mHigh').innerText = high + (high.includes('m') ? '' : 'm');
         }
